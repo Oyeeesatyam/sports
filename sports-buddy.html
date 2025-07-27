@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sports Buddy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.4/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.4/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.4/firebase-firestore.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto&display=swap">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f0f4f8;
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #0077cc;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+    }
+    .box {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    }
+    .event {
+      background: #e0f7fa;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🏅 Sports Buddy</h1>
+
+  <div class="box" id="auth-section">
+    <h2>Login</h2>
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+  </div>
+
+  <div class="box" id="dashboard" style="display: none;">
+    <h2>Welcome, <span id="userEmail"></span></h2>
+
+    <h3>Create Sport Event</h3>
+    <input id="eventName" placeholder="Event Name" />
+    <select id="eventSport">
+      <option value="Cricket">Cricket</option>
+      <option value="Football">Football</option>
+      <option value="Badminton">Badminton</option>
+    </select>
+    <input id="eventCity" placeholder="City" />
+    <input id="eventArea" placeholder="Area" />
+    <input id="eventTime" placeholder="Date & Time" />
+    <button onclick="addEvent()">Add Event</button>
+
+    <h3>All Events</h3>
+    <div id="eventList"></div>
+
+    <button onclick="logout()">Logout</button>
+  </div>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_APP.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // Login/Register
+    function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+          document.getElementById("auth-section").style.display = "none";
+          document.getElementById("dashboard").style.display = "block";
+          document.getElementById("userEmail").textContent = email;
+          logAction("login");
+          loadEvents();
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function register() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.createUserWithEmailAndPassword(email, password)
+        .then(() => {
+          alert("Registered! Now login.");
+          logAction("register");
+        })
+        .catch(err => alert(err.message));
+    }
+
+    // Add Event
+    function addEvent() {
+      const name = document.getElementById("eventName").value;
+      const sport = document.getElementById("eventSport").value;
+      const city = document.getElementById("eventCity").value;
+      const area = document.getElementById("eventArea").value;
+      const time = document.getElementById("eventTime").value;
+
+      db.collection("events").add({
+        name, sport, city, area, time,
+        createdBy: auth.currentUser.email,
+        createdAt: new Date()
+      }).then(() => {
+        alert("Event added");
+        logAction("add_event");
+        loadEvents();
+      });
+    }
+
+    // Load Events
+    function loadEvents() {
+      db.collection("events").orderBy("createdAt", "desc").get()
+        .then(snapshot => {
+          const container = document.getElementById("eventList");
+          container.innerHTML = "";
+          snapshot.forEach(doc => {
+            const e = doc.data();
+            container.innerHTML += `
+              <div class="event">
+                <strong>${e.name}</strong> - ${e.sport}<br/>
+                ${e.city}, ${e.area}<br/>
+                🕒 ${e.time}<br/>
+                👤 ${e.createdBy}
+              </div>
+            `;
+          });
+        });
+    }
+
+    // Logging
+    function logAction(action) {
+      if (!auth.currentUser) return;
+      db.collection("logs").add({
+        user: auth.currentUser.email,
+        action,
+        timestamp: new Date()
+      });
+    }
+
+    // Logout
+    function logout() {
+      auth.signOut().then(() => {
+        document.getElementById("auth-section").style.display = "block";
+        document.getElementById("dashboard").style.display = "none";
+        alert("Logged out");
+        logAction("logout");
+      });
+    }
+
+    // Auto-login session check
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById("auth-section").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        document.getElementById("userEmail").textContent = user.email;
+        loadEvents();
+      }
+    });
+  </script>
+</body>
+</html>
